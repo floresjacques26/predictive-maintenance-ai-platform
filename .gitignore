@@ -1,0 +1,63 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Data (large files — committed via .gitkeep placeholders only)
+data/raw/*.csv
+data/raw/*.parquet
+data/processed/*.npy
+data/processed/*.pkl
+data/processed/*.npy
+data/synthetic/*.csv
+
+# Model checkpoints & artefacts
+models/checkpoints/*.pt
+models/checkpoints/*.pth
+models/checkpoints/**/*.pt
+models/checkpoints/**/*.pth
+models/baselines/*.joblib
+models/baselines/**/*.joblib
+models/hpo_checkpoints/
+
+# Reports (generated — not committed)
+reports/
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Optuna DB
+*.db
+
+# Environment
+.env

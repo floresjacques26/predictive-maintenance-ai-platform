@@ -1,0 +1,44 @@
+data:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  synthetic_dir: "data/synthetic"
+  window_size: 50         # timesteps per sample window
+  step_size: 10           # sliding window stride
+  test_size: 0.2
+  val_size: 0.1
+  random_seed: 42
+  failure_horizon: 30     # predict failure within next N timesteps
+
+features:
+  sensor_columns:
+    - temperature
+    - vibration
+    - pressure
+    - rpm
+    - current
+  target_column: "failure_imminent"
+  normalize: true
+  scaler_type: "standard"  # standard | minmax | robust
+
+training:
+  epochs: 100
+  batch_size: 64
+  learning_rate: 0.001
+  weight_decay: 1.0e-4
+  early_stopping_patience: 15
+  early_stopping_metric: "val_f1"
+  early_stopping_mode: "max"
+  gradient_clip_norm: 1.0
+  checkpoint_dir: "models/checkpoints"
+  pos_weight_auto: true    # auto-compute class weight from data
+
+experiment:
+  mlflow_tracking_uri: "mlruns"
+  experiment_name: "predictive_maintenance"
+  log_every_n_epochs: 5
+
+evaluation:
+  threshold: 0.5
+  bootstrap_n_samples: 1000
+  bootstrap_ci: 0.95
+  threshold_steps: 100

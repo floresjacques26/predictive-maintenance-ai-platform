@@ -1,0 +1,35 @@
+# Core ML & Deep Learning
+torch>=2.1.0
+scikit-learn>=1.3.0
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.11.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Experiment Tracking
+mlflow>=2.7.0
+
+# API
+fastapi>=0.103.0
+pydantic>=2.3.0
+uvicorn>=0.23.0
+
+# Hyperparameter Optimization
+optuna>=3.3.0
+
+# Configuration
+pyyaml>=6.0
+python-dotenv>=1.0.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+httpx>=0.24.0
+
+# CLI & Utilities
+click>=8.1.0
+tqdm>=4.65.0
+joblib>=1.3.0

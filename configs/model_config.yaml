@@ -1,0 +1,39 @@
+lstm:
+  input_size: 5          # must match number of sensor_columns
+  hidden_size: 128
+  num_layers: 2
+  dropout: 0.3
+  bidirectional: false
+  output_size: 1
+
+baseline_rf:
+  n_estimators: 200
+  max_depth: 12
+  min_samples_split: 5
+  min_samples_leaf: 2
+  max_features: "sqrt"
+  class_weight: "balanced"
+  random_state: 42
+  n_jobs: -1
+
+baseline_lr:
+  C: 1.0
+  max_iter: 1000
+  class_weight: "balanced"
+  random_state: 42
+  solver: "lbfgs"
+
+hyperparameter_search:
+  n_trials: 50
+  timeout: 3600          # seconds
+  sampler: "tpe"
+  direction: "maximize"
+  metric: "val_f1"
+
+  search_space:
+    hidden_size: [64, 256]
+    num_layers: [1, 3]
+    dropout: [0.1, 0.5]
+    learning_rate: [1.0e-4, 1.0e-2]
+    batch_size: [32, 128]
+    weight_decay: [1.0e-5, 1.0e-3]
