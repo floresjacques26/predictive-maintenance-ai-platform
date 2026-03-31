@@ -1,3 +1,15 @@
+# Which dataset to use: "synthetic" or "cmapss"
+# Override at runtime with --dataset flag or by merging cmapss_config.yaml
+dataset:
+  type: "synthetic"
+  cmapss:
+    data_dir: "data/cmapss"
+    subset: "FD001"
+    failure_horizon: 30
+    clip_rul: 125
+    include_op_settings: null
+    sensor_indices: null
+
 data:
   raw_dir: "data/raw"
   processed_dir: "data/processed"
