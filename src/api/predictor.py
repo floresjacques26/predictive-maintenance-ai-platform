@@ -96,13 +96,20 @@ class MaintenancePredictor:
         # Reconstruct model architecture from checkpoint config
         checkpoint = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
         cfg = checkpoint.get("config", {})
+        state = checkpoint["model_state_dict"]
+
+        # Derive input_size from actual weights (robust to wrong config values)
+        input_size = int(state["lstm.weight_ih_l0"].shape[1])
+        hidden_size = int(state["lstm.weight_ih_l0"].shape[0]) // 4
+        num_layers = cfg.get("num_layers", 2)
+        bidirectional = cfg.get("bidirectional", False)
 
         self._model = LSTMClassifier(
-            input_size=cfg.get("input_size", len(SENSOR_ORDER)),
-            hidden_size=cfg.get("hidden_size", 128),
-            num_layers=cfg.get("num_layers", 2),
-            dropout=cfg.get("dropout", 0.0),  # no dropout at inference
-            bidirectional=cfg.get("bidirectional", False),
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            dropout=0.0,  # no dropout at inference
+            bidirectional=bidirectional,
         )
         self._model.load_state_dict(checkpoint["model_state_dict"])
         self._model.to(self.device)
