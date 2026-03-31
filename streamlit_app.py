@@ -90,9 +90,9 @@ with st.sidebar:
 
     dataset = st.selectbox(
         "Dataset",
-        options=["synthetic", "cmapss"],
+        options=["cmapss", "synthetic"],
         index=0,
-        help="Switch between the synthetic benchmark and the NASA CMAPSS real dataset.",
+        help="Switch between the NASA CMAPSS real dataset and the synthetic benchmark.",
     )
     cmapss_subset = "FD001"
     if dataset == "cmapss":
