@@ -6,27 +6,11 @@
 
 ---
 
-## 🚀 Demo Interativa
-
-Acesse o dashboard diretamente:
-
-👉 **[Abrir Dashboard](https://floresjacques26-predictive-maintenance-ai--streamlit-app-m3u4ig.streamlit.app/)**
-
-Ou execute localmente:
-
-```bash
-pip install -r requirements.txt
-streamlit run streamlit_app.py
-```
-
----
-
 ## 📌 Navegação Rápida
 
 - [O que este projeto demonstra](#o-que-este-projeto-demonstra)
 - [Resultados](#resultados--nasa-cmapss-fd001)
 - [Gráficos de Avaliação](#gráficos-de-avaliação)
-- [Demo — Dashboard Interativo](#demo--dashboard-interativo)
 - [Quick Start](#quick-start)
 - [Arquitetura do Sistema](#arquitetura-do-sistema)
 - [Modelos](#modelos)
