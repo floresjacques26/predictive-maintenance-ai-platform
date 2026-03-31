@@ -86,25 +86,6 @@
 
 ---
 
-## Demo — Dashboard Interativo
-
-```bash
-streamlit run streamlit_app.py
-```
-
-O dashboard tem 5 abas:
-
-| Aba | Conteúdo |
-|-----|----------|
-| **Overview** | Resumo do projeto, arquitetura dos modelos, estatísticas do dataset |
-| **Benchmark** | Tabela de métricas completa, ICs bootstrap, todos os gráficos gerados |
-| **Live Prediction** | Entrada de sensores em tempo real → probabilidade de falha com gauge Plotly |
-| **Error Analysis** | Detalhamento de FP/FN por tipo de máquina, fase de degradação e proximidade à falha |
-| **Interpretability** | Importância por sensor, saliency temporal, gradiente de entrada |
-
-> O seletor de dataset na sidebar alterna entre dado sintético e NASA CMAPSS (FD001–FD004), derivando automaticamente todos os caminhos de modelos e relatórios.
-
----
 
 ## Quick Start
 
