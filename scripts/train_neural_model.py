@@ -1,12 +1,16 @@
 """Train LSTM or 1D CNN with full pipeline: data → train → evaluate → persist.
 
-This script replaces train_lstm.py and supports both neural model architectures.
+Supports both the synthetic dataset and the NASA CMAPSS real dataset.
 
 Usage
 -----
+# Synthetic (default)
 python scripts/train_neural_model.py --model-type lstm
 python scripts/train_neural_model.py --model-type cnn --epochs 50
-python scripts/train_neural_model.py --model-type lstm --device cuda
+
+# NASA CMAPSS
+python scripts/train_neural_model.py --model-type lstm --dataset cmapss
+python scripts/train_neural_model.py --model-type lstm --dataset cmapss --cmapss-subset FD002
 """
 
 import argparse
@@ -20,6 +24,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.data.dataset import create_dataloaders
+from src.data.dataset_factory import load_dataset
 from src.data.preprocessing import SensorDataPreprocessor
 from src.evaluation.calibration import compare_calibrators
 from src.evaluation.metrics import compute_classification_metrics, find_optimal_threshold
@@ -34,8 +39,6 @@ from src.utils.logger import get_logger
 
 logger = get_logger("train_neural_model")
 
-SENSOR_COLS = ["temperature", "vibration", "pressure", "rpm", "current"]
-
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train LSTM or CNN for predictive maintenance.")
@@ -43,14 +46,23 @@ def parse_args() -> argparse.Namespace:
         "--model-type", choices=["lstm", "cnn"], default="lstm",
         help="Neural architecture to train."
     )
-    parser.add_argument("--data-path", type=str, default="data/synthetic/sensor_data.csv")
+    parser.add_argument(
+        "--dataset", choices=["synthetic", "cmapss"], default="synthetic",
+        help="Dataset to use for training.",
+    )
+    parser.add_argument(
+        "--cmapss-subset", choices=["FD001", "FD002", "FD003", "FD004"], default="FD001",
+        help="CMAPSS sub-dataset (only used when --dataset cmapss).",
+    )
+    parser.add_argument("--data-path", type=str, default="data/synthetic/sensor_data.csv",
+                        help="CSV path for synthetic dataset (ignored for cmapss).")
     parser.add_argument("--config", type=str, default="configs/base_config.yaml")
     parser.add_argument("--model-config", type=str, default="configs/model_config.yaml")
     parser.add_argument("--epochs", type=int, default=None, help="Override config epochs.")
     parser.add_argument("--checkpoint-dir", type=str, default=None,
-                        help="Override checkpoint dir. Defaults to models/checkpoints/<model_type>.")
+                        help="Defaults to models/checkpoints/<model_type> (or .../cmapss/<subset>/<model_type>).")
     parser.add_argument("--report-dir", type=str, default=None,
-                        help="Override report dir. Defaults to reports/<model_type>.")
+                        help="Defaults to reports/<model_type> (or reports/cmapss/<model_type>).")
     parser.add_argument("--device", type=str, default=None, help="cpu | cuda | mps")
     return parser.parse_args()
 
@@ -102,10 +114,24 @@ def main() -> None:
     args = parse_args()
     model_type = args.model_type.upper()
 
-    checkpoint_dir = args.checkpoint_dir or f"models/checkpoints/{args.model_type}"
-    report_dir = args.report_dir or f"reports/{args.model_type}"
+    # ── Config (merge CMAPSS overrides when needed) ───────────────────────
+    config_paths = [args.config, args.model_config]
+    if args.dataset == "cmapss":
+        config_paths.append("configs/cmapss_config.yaml")
+    cfg = load_config(*config_paths)
 
-    cfg = load_config(args.config, args.model_config)
+    # Allow --cmapss-subset to override the config value
+    if args.dataset == "cmapss":
+        cfg.setdefault("dataset", {}).setdefault("cmapss", {})["subset"] = args.cmapss_subset
+
+    # ── Paths ─────────────────────────────────────────────────────────────
+    if args.dataset == "cmapss":
+        subset = args.cmapss_subset
+        checkpoint_dir = args.checkpoint_dir or f"models/checkpoints/cmapss/{subset}/{args.model_type}"
+        report_dir     = args.report_dir or f"reports/cmapss/{subset}/{args.model_type}"
+    else:
+        checkpoint_dir = args.checkpoint_dir or f"models/checkpoints/{args.model_type}"
+        report_dir     = args.report_dir or f"reports/{args.model_type}"
 
     device_str = args.device or (
         "cuda" if torch.cuda.is_available()
@@ -113,14 +139,17 @@ def main() -> None:
         else "cpu"
     )
     device = torch.device(device_str)
-    logger.info(f"Training {model_type} | device={device}")
+    logger.info(f"Training {model_type} | dataset={args.dataset} | device={device}")
 
     # ── Data ─────────────────────────────────────────────────────────────
-    logger.info(f"Loading data: {args.data_path}")
-    df = pd.read_csv(args.data_path)
+    df, sensor_cols = load_dataset(
+        dataset_type=args.dataset,
+        cfg=cfg,
+        data_path=args.data_path,
+    )
 
     preprocessor = SensorDataPreprocessor(
-        sensor_columns=SENSOR_COLS,
+        sensor_columns=sensor_cols,
         target_column="failure_imminent",
         window_size=cfg.data.window_size,
         step_size=cfg.data.step_size,
@@ -145,7 +174,7 @@ def main() -> None:
     )
 
     # ── Model ─────────────────────────────────────────────────────────────
-    model = _build_model(args.model_type, cfg, n_features=len(SENSOR_COLS))
+    model = _build_model(args.model_type, cfg, n_features=len(sensor_cols))
     model_config_dict = _get_model_config_dict(args.model_type, cfg)
 
     # ── Training ──────────────────────────────────────────────────────────
