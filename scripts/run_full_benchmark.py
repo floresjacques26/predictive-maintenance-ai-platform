@@ -5,7 +5,8 @@ Produces a complete reproducible benchmark of all four model families
 
 Outputs
 -------
-reports/benchmark/
+reports/benchmark/             (synthetic)
+reports/benchmark/cmapss/FD001 (CMAPSS)
   ├── metrics_table.txt          — human-readable comparison table
   ├── benchmark_results.json     — full structured report
   ├── roc_all_models.png
@@ -19,8 +20,10 @@ reports/benchmark/
 
 Usage
 -----
-python scripts/run_full_benchmark.py                 # train + benchmark
-python scripts/run_full_benchmark.py --skip-training # benchmark only (use existing checkpoints)
+python scripts/run_full_benchmark.py                          # synthetic, train + benchmark
+python scripts/run_full_benchmark.py --skip-training          # benchmark only
+python scripts/run_full_benchmark.py --dataset cmapss         # NASA CMAPSS FD001
+python scripts/run_full_benchmark.py --dataset cmapss --cmapss-subset FD002
 python scripts/run_full_benchmark.py --n-machines 200
 """
 
@@ -38,6 +41,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from src.data.dataset_factory import load_dataset
 from src.data.preprocessing import SensorDataPreprocessor
 from src.data.synthetic_generator import SyntheticSensorDataGenerator
 from src.evaluation.calibration import compute_brier_score, compute_expected_calibration_error
@@ -54,8 +58,6 @@ from src.utils.logger import get_logger
 
 logger = get_logger("run_full_benchmark")
 
-SENSOR_COLS = ["temperature", "vibration", "pressure", "rpm", "current"]
-REPORT_DIR = Path("reports/benchmark")
 DATA_PATH = Path("data/synthetic/sensor_data.csv")
 COST_FN = 50_000   # Missed failure: unplanned downtime + emergency repair
 COST_FP = 5_000    # False alarm: unnecessary planned maintenance stop
@@ -66,11 +68,19 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--skip-training", action="store_true",
                    help="Skip training and use existing checkpoints.")
     p.add_argument("--n-machines", type=int, default=200,
-                   help="Number of simulated machines to generate.")
+                   help="Number of simulated machines to generate (synthetic only).")
     p.add_argument("--epochs", type=int, default=50,
                    help="Max training epochs for neural models.")
     p.add_argument("--config", type=str, default="configs/base_config.yaml")
     p.add_argument("--model-config", type=str, default="configs/model_config.yaml")
+    p.add_argument(
+        "--dataset", choices=["synthetic", "cmapss"], default="synthetic",
+        help="Dataset to benchmark.",
+    )
+    p.add_argument(
+        "--cmapss-subset", choices=["FD001", "FD002", "FD003", "FD004"], default="FD001",
+        help="CMAPSS sub-dataset (only used when --dataset cmapss).",
+    )
     return p.parse_args()
 
 
@@ -102,7 +112,14 @@ def _run_script(cmd: list[str]) -> None:
         logger.warning(f"Script exited with code {result.returncode}")
 
 
-def train_all_models(epochs: int, config: str, model_config: str) -> None:
+def train_all_models(
+    epochs: int, config: str, model_config: str,
+    dataset: str = "synthetic", cmapss_subset: str = "FD001",
+) -> None:
+    dataset_flags = ["--dataset", dataset]
+    if dataset == "cmapss":
+        dataset_flags += ["--cmapss-subset", cmapss_subset]
+
     logger.info("=" * 60)
     logger.info("Training LSTM…")
     _run_script([
@@ -111,6 +128,7 @@ def train_all_models(epochs: int, config: str, model_config: str) -> None:
         "--epochs", str(epochs),
         "--config", config,
         "--model-config", model_config,
+        *dataset_flags,
     ])
 
     logger.info("=" * 60)
@@ -121,6 +139,7 @@ def train_all_models(epochs: int, config: str, model_config: str) -> None:
         "--epochs", str(epochs),
         "--config", config,
         "--model-config", model_config,
+        *dataset_flags,
     ])
 
     logger.info("=" * 60)
@@ -128,6 +147,7 @@ def train_all_models(epochs: int, config: str, model_config: str) -> None:
     _run_script([
         sys.executable, "scripts/train_baseline.py",
         "--config", config,
+        *dataset_flags,
     ])
 
 
@@ -161,16 +181,21 @@ def _load_neural_model(ckpt_path: Path, model_cls, sensor_cols: list[str]) -> to
     return model
 
 
-def collect_predictions(X_test: np.ndarray) -> dict[str, np.ndarray]:
+def collect_predictions(
+    X_test: np.ndarray,
+    sensor_cols: list[str],
+    ckpt_base: str = "models/checkpoints",
+    baseline_base: str = "models/baselines",
+) -> dict[str, np.ndarray]:
     predictions: dict[str, np.ndarray] = {}
 
     # LSTM
     for lstm_path in [
-        Path("models/checkpoints/lstm/best_model.pt"),
-        Path("models/checkpoints/best_model.pt"),
+        Path(ckpt_base) / "lstm" / "best_model.pt",
+        Path(ckpt_base) / "best_model.pt",
     ]:
         if "LSTM" not in predictions:
-            model = _load_neural_model(lstm_path, LSTMClassifier, SENSOR_COLS)
+            model = _load_neural_model(lstm_path, LSTMClassifier, sensor_cols)
             if model is not None:
                 with torch.no_grad():
                     proba = model.predict_proba(
@@ -180,8 +205,8 @@ def collect_predictions(X_test: np.ndarray) -> dict[str, np.ndarray]:
                 logger.info(f"LSTM loaded from {lstm_path}")
 
     # CNN
-    cnn_path = Path("models/checkpoints/cnn/best_model.pt")
-    model = _load_neural_model(cnn_path, TemporalCNNClassifier, SENSOR_COLS)
+    cnn_path = Path(ckpt_base) / "cnn" / "best_model.pt"
+    model = _load_neural_model(cnn_path, TemporalCNNClassifier, sensor_cols)
     if model is not None:
         with torch.no_grad():
             proba = model.predict_proba(
@@ -191,14 +216,14 @@ def collect_predictions(X_test: np.ndarray) -> dict[str, np.ndarray]:
         logger.info(f"CNN loaded from {cnn_path}")
 
     # Random Forest
-    rf_path = Path("models/baselines/randomforest.joblib")
+    rf_path = Path(baseline_base) / "randomforest.joblib"
     if rf_path.exists():
         rf = RandomForestBaseline.load(rf_path)
         predictions["RandomForest"] = rf.predict_proba(X_test)
         logger.info("RandomForest loaded.")
 
     # Logistic Regression
-    lr_path = Path("models/baselines/logisticregression.joblib")
+    lr_path = Path(baseline_base) / "logisticregression.joblib"
     if lr_path.exists():
         lr = LogisticRegressionBaseline.load(lr_path)
         predictions["LogisticRegression"] = lr.predict_proba(X_test)
@@ -301,48 +326,6 @@ def print_metrics_table(all_metrics: dict[str, dict], ci_results: dict[str, dict
     return table
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Step 7: Visualisations
-# ──────────────────────────────────────────────────────────────────────────────
-
-def generate_all_plots(
-    y_true: np.ndarray,
-    predictions: dict[str, np.ndarray],
-    all_metrics: dict[str, dict],
-    cost_matrix: CostMatrix,
-) -> None:
-    viz = EvaluationVisualizer(output_dir=str(REPORT_DIR))
-
-    # Multi-model curves
-    viz.plot_roc_curve(y_true, predictions, save_name="roc_all_models.png")
-    viz.plot_pr_curve(y_true, predictions, save_name="pr_all_models.png")
-    viz.plot_calibration(y_true, predictions, save_name="calibration_all_models.png")
-    viz.plot_model_comparison(
-        all_metrics,
-        metrics=["f1", "roc_auc", "pr_auc", "recall", "precision", "mcc"],
-        save_name="comparison_bar.png",
-    )
-    viz.plot_cost_curves(y_true, predictions, cost_matrix, save_name="cost_curve_all_models.png")
-
-    # Per-model plots
-    for name, proba in predictions.items():
-        thresh = all_metrics[name]["threshold"]
-        safe_name = name.lower().replace(" ", "_")
-        viz.plot_confusion_matrix(
-            y_true, proba, threshold=thresh,
-            model_name=name, save_name=f"{safe_name}_confusion_matrix.png",
-        )
-        viz.plot_threshold_analysis(
-            y_true, proba, model_name=name,
-            save_name=f"{safe_name}_threshold_analysis.png",
-        )
-        viz.plot_prediction_distribution(
-            y_true, proba, model_name=name,
-            save_name=f"{safe_name}_prediction_dist.png",
-        )
-
-    logger.info(f"All plots saved → {REPORT_DIR}")
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Main
@@ -350,25 +333,50 @@ def generate_all_plots(
 
 def main() -> None:
     args = parse_args()
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # ── Paths (dataset-aware) ─────────────────────────────────────────────────
+    if args.dataset == "cmapss":
+        subset = args.cmapss_subset
+        report_dir  = Path(f"reports/benchmark/cmapss/{subset}")
+        ckpt_base   = f"models/checkpoints/cmapss/{subset}"
+        baseline_base = f"models/baselines/cmapss/{subset}"
+    else:
+        report_dir  = Path("reports/benchmark")
+        ckpt_base   = "models/checkpoints"
+        baseline_base = "models/baselines"
+
+    report_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── Config ────────────────────────────────────────────────────────────────
+    config_paths = [args.config, args.model_config]
+    if args.dataset == "cmapss":
+        config_paths.append("configs/cmapss_config.yaml")
+    cfg = load_config(*config_paths)
+    if args.dataset == "cmapss":
+        cfg.setdefault("dataset", {}).setdefault("cmapss", {})["subset"] = args.cmapss_subset
 
     # ── Data ──────────────────────────────────────────────────────────────────
-    generate_data(args.n_machines)
+    if args.dataset == "synthetic":
+        generate_data(args.n_machines)
 
     # ── Training ──────────────────────────────────────────────────────────────
     if not args.skip_training:
-        train_all_models(args.epochs, args.config, args.model_config)
+        train_all_models(
+            args.epochs, args.config, args.model_config,
+            dataset=args.dataset, cmapss_subset=args.cmapss_subset,
+        )
 
     # ── Preprocessor / test split ─────────────────────────────────────────────
-    df = pd.read_csv(DATA_PATH)
-    cfg = load_config(args.config, args.model_config)
+    df, sensor_cols = load_dataset(
+        dataset_type=args.dataset, cfg=cfg, data_path=str(DATA_PATH)
+    )
 
     # Prefer saved preprocessor (same split as during training)
     preprocessor: SensorDataPreprocessor | None = None
     for ckpt_dir in [
-        Path("models/checkpoints/lstm"),
-        Path("models/checkpoints/cnn"),
-        Path("models/checkpoints"),
+        Path(ckpt_base) / "lstm",
+        Path(ckpt_base) / "cnn",
+        Path(ckpt_base),
     ]:
         pp_path = ckpt_dir / "preprocessor.joblib"
         if pp_path.exists():
@@ -379,7 +387,7 @@ def main() -> None:
     if preprocessor is None:
         logger.warning("No saved preprocessor found. Creating fresh split.")
         preprocessor = SensorDataPreprocessor(
-            sensor_columns=SENSOR_COLS,
+            sensor_columns=sensor_cols,
             target_column="failure_imminent",
             window_size=cfg.data.window_size,
             step_size=cfg.data.step_size,
@@ -393,7 +401,7 @@ def main() -> None:
     logger.info(f"Test set: {len(y_true):,} windows | positive rate: {y_true.mean():.2%}")
 
     # ── Collect predictions ───────────────────────────────────────────────────
-    predictions = collect_predictions(X_test)
+    predictions = collect_predictions(X_test, sensor_cols, ckpt_base, baseline_base)
     if not predictions:
         logger.error("No trained models found. Run without --skip-training.")
         sys.exit(1)
@@ -417,14 +425,41 @@ def main() -> None:
 
     # ── Table ─────────────────────────────────────────────────────────────────
     table_str = print_metrics_table(all_metrics, ci_results)
-    table_path = REPORT_DIR / "metrics_table.txt"
+    table_path = report_dir / "metrics_table.txt"
     table_path.write_text(table_str)
 
     # ── Plots ─────────────────────────────────────────────────────────────────
-    generate_all_plots(y_true, predictions, all_metrics, cost_matrix)
+    viz = EvaluationVisualizer(output_dir=str(report_dir))
+    viz.plot_roc_curve(y_true, predictions, save_name="roc_all_models.png")
+    viz.plot_pr_curve(y_true, predictions, save_name="pr_all_models.png")
+    viz.plot_calibration(y_true, predictions, save_name="calibration_all_models.png")
+    viz.plot_model_comparison(
+        all_metrics,
+        metrics=["f1", "roc_auc", "pr_auc", "recall", "precision", "mcc"],
+        save_name="comparison_bar.png",
+    )
+    viz.plot_cost_curves(y_true, predictions, cost_matrix, save_name="cost_curve_all_models.png")
+    for name, proba in predictions.items():
+        thresh = all_metrics[name]["threshold"]
+        safe_name = name.lower().replace(" ", "_")
+        viz.plot_confusion_matrix(
+            y_true, proba, threshold=thresh,
+            model_name=name, save_name=f"{safe_name}_confusion_matrix.png",
+        )
+        viz.plot_threshold_analysis(
+            y_true, proba, model_name=name,
+            save_name=f"{safe_name}_threshold_analysis.png",
+        )
+        viz.plot_prediction_distribution(
+            y_true, proba, model_name=name,
+            save_name=f"{safe_name}_prediction_dist.png",
+        )
+    logger.info(f"All plots saved → {report_dir}")
 
     # ── JSON report ───────────────────────────────────────────────────────────
     report = {
+        "dataset": args.dataset,
+        "cmapss_subset": args.cmapss_subset if args.dataset == "cmapss" else None,
         "n_test_windows": int(len(y_true)),
         "positive_rate": float(y_true.mean()),
         "cost_matrix": {"cost_fn": COST_FN, "cost_fp": COST_FP},
@@ -433,14 +468,14 @@ def main() -> None:
         "bootstrap_ci": ci_results,
         "significance_tests": sig_results,
     }
-    report_path = REPORT_DIR / "benchmark_results.json"
+    report_path = report_dir / "benchmark_results.json"
     with open(report_path, "w") as f:
         json.dump(report, f, indent=2, default=str)
 
     logger.info(f"\nBenchmark complete.")
     logger.info(f"  Report  → {report_path}")
     logger.info(f"  Table   → {table_path}")
-    logger.info(f"  Figures → {REPORT_DIR}/")
+    logger.info(f"  Figures → {report_dir}/")
 
 
 if __name__ == "__main__":
