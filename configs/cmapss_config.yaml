@@ -1,0 +1,39 @@
+# CMAPSS dataset configuration overrides.
+# Merged on top of base_config.yaml when --dataset cmapss is used.
+#
+# Usage:
+#   python scripts/train_neural_model.py --dataset cmapss
+#   python scripts/run_full_benchmark.py  --dataset cmapss --cmapss-subset FD001
+
+dataset:
+  type: "cmapss"
+  cmapss:
+    data_dir: "data/cmapss"
+    subset: "FD001"            # FD001 | FD002 | FD003 | FD004
+    failure_horizon: 30        # label cycles within 30 cycles of failure as positive
+    clip_rul: 125              # piece-wise linear RUL cap (standard in literature)
+    include_op_settings: null  # null = auto-detect (true for FD002/FD004)
+    # Sensor indices to include (1-based).  null = all non-near-constant sensors:
+    # [2,3,4,7,8,9,11,12,13,14,15,17,20,21]
+    sensor_indices: null
+
+# Window size tuned for CMAPSS: each "cycle" is coarser than a synthetic timestep.
+# 30 cycles ≈ 50 synthetic timesteps in terms of information content.
+data:
+  window_size: 30
+  step_size: 1       # dense stride fine for CMAPSS (cycles are already coarse)
+  failure_horizon: 30
+
+# RobustScaler handles the multi-modal distributions in FD002/FD004 better
+# (different operating conditions produce different sensor value ranges).
+features:
+  scaler_type: "robust"
+
+# Slightly adjusted training schedule for CMAPSS
+training:
+  epochs: 80
+  batch_size: 128
+  early_stopping_patience: 10
+
+experiment:
+  experiment_name: "predictive_maintenance_cmapss"
