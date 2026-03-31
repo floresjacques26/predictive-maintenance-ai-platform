@@ -2,7 +2,7 @@
 
 > Sistema end-to-end de machine learning para previsão de falhas industriais, cobrindo todo o ciclo — da ingestão de dados ao deploy em produção. Inclui calibração probabilística, otimização de decisão baseada em custo, avaliação estatística robusta, interpretabilidade e visualização interativa.
 
-**Stack:** Python · PyTorch · FastAPI · Streamlit · MLflow
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue) ![PyTorch](https://img.shields.io/badge/PyTorch-2.1%2B-orange) ![FastAPI](https://img.shields.io/badge/FastAPI-0.103%2B-green) ![Streamlit](https://img.shields.io/badge/Streamlit-1.28%2B-red) ![MLflow](https://img.shields.io/badge/MLflow-2.7%2B-blue)
 
 ---
 
