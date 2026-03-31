@@ -44,6 +44,25 @@ def _config_option():
     )
 
 
+def _dataset_options():
+    """Returns a composed decorator for --dataset / --cmapss-subset."""
+    def decorator(f):
+        f = click.option(
+            "--cmapss-subset",
+            type=click.Choice(["FD001", "FD002", "FD003", "FD004"]),
+            default="FD001", show_default=True,
+            help="CMAPSS sub-dataset (only used when --dataset cmapss).",
+        )(f)
+        f = click.option(
+            "--dataset",
+            type=click.Choice(["synthetic", "cmapss"]),
+            default="synthetic", show_default=True,
+            help="Dataset to use: synthetic (default) or NASA CMAPSS.",
+        )(f)
+        return f
+    return decorator
+
+
 # ── CLI group ──────────────────────────────────────────────────────────────────
 
 @click.group()
@@ -78,40 +97,51 @@ def generate(n_machines: int, failure_horizon: int, seed: int, output_dir: str):
 @cli.command()
 @click.option("--model", type=click.Choice(["lstm", "cnn", "baseline"]), required=True)
 @click.option("--epochs", default=None, type=int, help="Override config epochs.")
-@click.option("--checkpoint-dir", default="models/checkpoints", show_default=True)
-@click.option("--report-dir", default="reports", show_default=True)
+@click.option("--checkpoint-dir", default=None, show_default=False,
+              help="Checkpoint directory (auto-derived from dataset/model if omitted).")
+@click.option("--report-dir", default=None, show_default=False,
+              help="Report directory (auto-derived from dataset/model if omitted).")
+@_dataset_options()
 @_data_option()
 @_config_option()
 @_device_option()
-def train(model: str, epochs, checkpoint_dir: str, report_dir: str,
+def train(model: str, epochs, checkpoint_dir: str | None, report_dir: str | None,
+          dataset: str, cmapss_subset: str,
           data_path: str, config: str, device: str | None):
     """Train LSTM, CNN, or sklearn baseline models."""
     import subprocess
+
+    dataset_flags = ["--dataset", dataset]
+    if dataset == "cmapss":
+        dataset_flags += ["--cmapss-subset", cmapss_subset]
+
     if model == "baseline":
         cmd = [
             sys.executable, "scripts/train_baseline.py",
             "--data-path", data_path,
             "--config", config,
-            "--output-dir", f"{checkpoint_dir}/../baselines",
-            "--report-dir", report_dir,
+            *dataset_flags,
         ]
+        if checkpoint_dir:
+            cmd += ["--output-dir", checkpoint_dir]
+        if report_dir:
+            cmd += ["--report-dir", report_dir]
     else:
-        script = "scripts/train_lstm.py"
         cmd = [
-            sys.executable, script,
+            sys.executable, "scripts/train_neural_model.py",
+            "--model-type", model,
             "--data-path", data_path,
             "--config", config,
-            "--checkpoint-dir", checkpoint_dir,
-            "--report-dir", f"{report_dir}/{model}",
+            *dataset_flags,
         ]
         if epochs:
             cmd += ["--epochs", str(epochs)]
         if device:
             cmd += ["--device", device]
-        # Patch model type for CNN
-        if model == "cnn":
-            # train_lstm.py supports --model-type flag for CNN
-            cmd += ["--model-type", "cnn"]
+        if checkpoint_dir:
+            cmd += ["--checkpoint-dir", checkpoint_dir]
+        if report_dir:
+            cmd += ["--report-dir", report_dir]
 
     subprocess.run(cmd, check=True)
 
@@ -174,12 +204,23 @@ def tune(n_trials: int, timeout: float, epochs_per_trial: int, output_dir: str,
 # ── compare ───────────────────────────────────────────────────────────────────
 
 @cli.command()
-@_data_option()
+@click.option("--skip-training", is_flag=True, default=False,
+              help="Skip training — benchmark existing checkpoints only.")
+@click.option("--epochs", default=50, show_default=True, help="Max training epochs.")
+@_dataset_options()
 @_config_option()
-def compare(data_path: str, config: str):
-    """Compare all trained models on the held-out test set."""
+def compare(skip_training: bool, epochs: int, dataset: str, cmapss_subset: str, config: str):
+    """Benchmark all models (LSTM, CNN, RF, LR) on the held-out test set."""
     import subprocess
-    cmd = [sys.executable, "scripts/compare_models.py"]
+    cmd = [
+        sys.executable, "scripts/run_full_benchmark.py",
+        "--config", config,
+        "--epochs", str(epochs),
+        "--dataset", dataset,
+        "--cmapss-subset", cmapss_subset,
+    ]
+    if skip_training:
+        cmd.append("--skip-training")
     subprocess.run(cmd, check=True)
 
 
