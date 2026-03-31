@@ -1,6 +1,40 @@
 # Plataforma de Manutenção Preditiva com IA
 
-> Sistema completo de machine learning para predição de falhas industriais — do dado bruto ao deploy em produção, com calibração probabilística, análise de custo, testes de significância estatística e dashboard interativo.
+> Pipeline completo de machine learning para predição de falhas industriais — do dado bruto ao sistema em produção. Inclui calibração probabilística, otimização de threshold por custo, testes de significância estatística, interpretabilidade de modelos e dashboard interativo.
+
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue) ![PyTorch](https://img.shields.io/badge/PyTorch-2.1%2B-orange) ![FastAPI](https://img.shields.io/badge/FastAPI-0.103%2B-green) ![Streamlit](https://img.shields.io/badge/Streamlit-1.28%2B-red) ![MLflow](https://img.shields.io/badge/MLflow-2.7%2B-blue)
+
+---
+
+## 🚀 Demo Interativa
+
+Acesse o dashboard diretamente:
+
+👉 **[INSERIR LINK STREAMLIT CLOUD]**
+
+Ou execute localmente:
+
+```bash
+pip install -r requirements.txt
+streamlit run streamlit_app.py
+```
+
+---
+
+## 📌 Navegação Rápida
+
+- [O que este projeto demonstra](#o-que-este-projeto-demonstra)
+- [Resultados](#resultados--nasa-cmapss-fd001)
+- [Gráficos de Avaliação](#gráficos-de-avaliação)
+- [Demo — Dashboard Interativo](#demo--dashboard-interativo)
+- [Quick Start](#quick-start)
+- [Arquitetura do Sistema](#arquitetura-do-sistema)
+- [Modelos](#modelos)
+- [Pipeline de Dados](#pipeline-de-dados)
+- [Suite de Avaliação](#suite-de-avaliação)
+- [API REST](#api-rest)
+- [Limitações](#limitações)
+- [Autor](#autor)
 
 ---
 
@@ -11,7 +45,7 @@
 | **Modelagem de séries temporais** | LSTM bidirecional, CNN temporal com dilatação residual |
 | **Pipeline end-to-end** | Geração de dados → pré-processamento → treino → avaliação → API REST |
 | **Dataset real (NASA CMAPSS)** | Loader completo para os 4 sub-datasets de degradação de turbinas |
-| **Métricas adequadas para dados desbalanceados** | PR-AUC, F1, MCC, Brier Score, ECE |
+| **Métricas para dados desbalanceados** | PR-AUC, F1, MCC, Brier Score, ECE |
 | **Calibração probabilística** | Platt Scaling, Isotonic Regression, Expected Calibration Error |
 | **Decisão orientada a custo** | Threshold otimizado por custo esperado ($50k FN vs $5k FP) |
 | **Significância estatística** | Teste McNemar, DeLong AUC CI, permutation test, bootstrap CI |
@@ -24,7 +58,7 @@
 
 ## Resultados — NASA CMAPSS FD001
 
-> Conjunto de teste: **3.272 janelas** | 20 motores | taxa de positivos: **18.95%**
+> Conjunto de teste: **3.272 janelas** | 20 motores | taxa de positivos: **18,95%**
 > Threshold selecionado por maximização de F1. Bootstrap CI com n=500 amostras.
 
 | Modelo | F1 | ROC-AUC | PR-AUC | Recall | Precision | MCC | Brier | ECE |
@@ -43,24 +77,26 @@
 | CNN 1D | 0.8917 [0.873, 0.910] | 0.9919 [0.990, 0.994] | 0.9698 [0.962, 0.977] |
 | Random Forest | 0.8891 [0.870, 0.906] | 0.9897 [0.987, 0.992] | 0.9645 [0.956, 0.972] |
 
-> **Análise**: Em FD001 (condição operacional única), a Regressão Logística apresenta desempenho surpreendentemente competitivo com os modelos neurais — o que é esperado quando os padrões de degradação são relativamente lineares e a condição é uniforme. O LSTM tem a maior precisão (0.9351), o que é vantajoso no contexto de custo assimétrico. Em datasets multicondiçôes como FD002/FD004, a vantagem dos modelos neurais deve ser mais pronunciada.
+> **Análise**: No FD001 (condição operacional única), a Regressão Logística apresenta desempenho surpreendentemente competitivo com os modelos neurais — o que é esperado quando os padrões de degradação são relativamente lineares e a condição é uniforme. O LSTM tem a maior precisão (0.9351), vantajosa no contexto de custo assimétrico onde falsos positivos são caros. Em datasets multi-condição como FD002/FD004, a superioridade dos modelos neurais deve ser mais pronunciada.
 
 ---
 
 ## Gráficos de Avaliação
 
+> Gerados automaticamente pelo benchmark — NASA CMAPSS FD001.
+
 <table>
 <tr>
-<td><img src="reports/benchmark/cmapss/FD001/roc_all_models.png" alt="Curvas ROC" width="380"/><br><em>Curvas ROC — todos os modelos</em></td>
-<td><img src="reports/benchmark/cmapss/FD001/pr_all_models.png" alt="Curvas PR" width="380"/><br><em>Curvas Precisão-Recall (métrica principal para dados desbalanceados)</em></td>
+<td><img src="assets/images/roc_all_models.png" alt="Curvas ROC" width="380"/><br><em>Curvas ROC — todos os modelos</em></td>
+<td><img src="assets/images/pr_all_models.png" alt="Curvas PR" width="380"/><br><em>Curvas Precisão-Recall (métrica principal para dados desbalanceados)</em></td>
 </tr>
 <tr>
-<td><img src="reports/benchmark/cmapss/FD001/calibration_all_models.png" alt="Calibração" width="380"/><br><em>Calibração probabilística — reliability diagram</em></td>
-<td><img src="reports/benchmark/cmapss/FD001/comparison_bar.png" alt="Comparação" width="380"/><br><em>Comparação de métricas entre modelos</em></td>
+<td><img src="assets/images/calibration_all_models.png" alt="Calibração" width="380"/><br><em>Calibração probabilística — reliability diagram</em></td>
+<td><img src="assets/images/comparison_bar.png" alt="Comparação de Modelos" width="380"/><br><em>Comparação de métricas entre modelos</em></td>
 </tr>
 <tr>
-<td><img src="reports/benchmark/cmapss/FD001/cost_curve_all_models.png" alt="Curvas de Custo" width="380"/><br><em>Custo esperado por threshold — FN=$50k, FP=$5k</em></td>
-<td><img src="reports/benchmark/cmapss/FD001/lstm_confusion_matrix.png" alt="Confusion Matrix LSTM" width="380"/><br><em>Matriz de confusão — LSTM</em></td>
+<td><img src="assets/images/cost_curve_all_models.png" alt="Curvas de Custo" width="380"/><br><em>Custo esperado por threshold — FN=$50k, FP=$5k</em></td>
+<td><img src="assets/images/lstm_confusion_matrix.png" alt="Matriz de Confusão — LSTM" width="380"/><br><em>Matriz de confusão — LSTM</em></td>
 </tr>
 </table>
 
@@ -77,12 +113,12 @@ O dashboard tem 5 abas:
 | Aba | Conteúdo |
 |-----|----------|
 | **Overview** | Resumo do projeto, arquitetura dos modelos, estatísticas do dataset |
-| **Benchmark** | Tabela de métricas completa, CIs bootstrap, todos os gráficos gerados |
-| **Live Prediction** | Input de sensores em tempo real → probabilidade de falha com gauge Plotly |
-| **Error Analysis** | Detalhamento de FP/FN por tipo de máquina, fase de degradação, proximidade à falha |
+| **Benchmark** | Tabela de métricas completa, ICs bootstrap, todos os gráficos gerados |
+| **Live Prediction** | Entrada de sensores em tempo real → probabilidade de falha com gauge Plotly |
+| **Error Analysis** | Detalhamento de FP/FN por tipo de máquina, fase de degradação e proximidade à falha |
 | **Interpretability** | Importância por sensor, saliency temporal, gradiente de entrada |
 
-> Selector de dataset no sidebar alterna entre dado sintético e NASA CMAPSS (FD001–FD004) com auto-derivação de todos os caminhos.
+> O seletor de dataset na sidebar alterna entre dado sintético e NASA CMAPSS (FD001–FD004), derivando automaticamente todos os caminhos de modelos e relatórios.
 
 ---
 
@@ -95,41 +131,41 @@ pip install -r requirements.txt
 # 2. Baixar e validar dados reais (NASA CMAPSS)
 python scripts/prepare_cmapss.py
 
-# 3. Treinar todos os modelos
+# 3. Treinar o modelo LSTM
 python scripts/train_neural_model.py --model-type lstm --dataset cmapss
-python scripts/train_neural_model.py --model-type cnn  --dataset cmapss
-python scripts/train_baseline.py --dataset cmapss
 
-# 4. Benchmark completo com gráficos e métricas
-python scripts/run_full_benchmark.py --dataset cmapss --cmapss-subset FD001 --skip-training
+# 4. Benchmark completo (treina todos os modelos + gera relatório)
+python scripts/run_full_benchmark.py --dataset cmapss --cmapss-subset FD001
 
-# 5. Dashboard
+# 5. Abrir dashboard
 streamlit run streamlit_app.py
+```
 
-# 6. API REST
-python cli.py serve
-# → http://localhost:8000/docs
+Para ver todas as opções disponíveis:
+
+```bash
+python cli.py --help
 ```
 
 ---
 
 ## Problema de Negócio
 
-Falhas não planejadas em equipamentos industriais são eventos críticos e caros. Uma única falha num motor de linha de produção pode custar entre $50.000 e $500.000 entre reparo emergencial, parada de produção e incidentes de segurança. A manutenção preventiva por intervalo fixo desperdiça recursos: a maioria das intervenções é desnecessária, e falhas ainda ocorrem nos intervalos.
+Falhas não planejadas em equipamentos industriais são eventos críticos e caros. Uma única falha num motor de linha de produção pode custar entre $50.000 e $500.000 em reparo emergencial, parada de produção e incidentes de segurança. A manutenção preventiva por intervalo fixo desperdiça recursos: a maioria das intervenções é desnecessária, e falhas ainda ocorrem entre os intervalos.
 
-**Manutenção preditiva** resolve isso monitorando continuamente sensores (vibração, temperatura, pressão, corrente, RPM) e emitindo alertas quando uma falha é estatisticamente iminente dentro de um horizonte configurável (ex: próximos 30 ciclos).
+**Manutenção preditiva** resolve isso monitorando continuamente sensores (vibração, temperatura, pressão, corrente, RPM) e emitindo alertas quando uma falha é estatisticamente iminente dentro de um horizonte configurável — por exemplo, os próximos 30 ciclos de operação.
 
-**Restrições de negócio incorporadas:**
+**Restrições de negócio incorporadas no design:**
 - **Custos assimétricos**: uma falha não detectada (FN) custa ~10× mais que um alarme falso (FP)
-- **Rótulos desbalanceados**: eventos de falha são raros (2–19% das janelas são positivas)
-- **Calibração importa**: planejadores de manutenção precisam confiar no score de probabilidade, não apenas no alerta binário
-- **Múltiplos perfis de degradação**: diferentes máquinas degradam de formas distintas
+- **Rótulos desbalanceados**: eventos de falha são raros — de 2% a 19% das janelas são positivas
+- **Calibração importa**: equipes de planejamento precisam confiar no score de probabilidade, não apenas no alerta binário
+- **Múltiplos perfis de degradação**: diferentes tipos de máquina degradam de formas distintas
 
 ---
 
-## Problema Técnico
+## Formulação Técnica
 
-Dado uma série temporal multivariada de sensores **x**₁:T ∈ ℝ^(T×F), prever:
+Dado uma série temporal multivariada de sensores **x**₁:T ∈ ℝ^(T×F), o objetivo é estimar:
 
 ```
 ŷ = P(falha nos próximos H ciclos | x₁:T)
@@ -137,7 +173,7 @@ Dado uma série temporal multivariada de sensores **x**₁:T ∈ ℝ^(T×F), pre
 
 onde H=30 é o horizonte de falha.
 
-Formulado como **classificação binária em janela deslizante** com:
+Formulado como **classificação binária em janela deslizante**:
 - Janelas extraídas por máquina com stride configurável
 - Label = 1 se um evento de falha ocorre nos próximos H passos após o fim da janela
 - Split a nível de máquina para prevenir vazamento temporal
@@ -148,35 +184,35 @@ Formulado como **classificação binária em janela deslizante** com:
 
 ### NASA CMAPSS — Dado Real
 
-Dataset de degradação de turbinas de avião (simulação baseada em física). Referência amplamente usada na literatura de PHM.
+Dataset de degradação de turbinas a jato (simulação baseada em física). Referência amplamente utilizada na literatura de PHM (Prognostics and Health Management).
 
-| Sub-dataset | Motores (treino) | Motores (teste) | Cond. operacionais | Modos de falha |
-|-------------|----------------|-----------------|--------------------|----------------|
+| Sub-dataset | Motores treino | Motores teste | Cond. operacionais | Modos de falha |
+|-------------|---------------|---------------|--------------------|----------------|
 | **FD001** | 100 | 100 | 1 | 1 |
 | **FD002** | 260 | 259 | 6 | 1 |
 | **FD003** | 100 | 100 | 1 | 2 |
 | **FD004** | 249 | 248 | 6 | 2 |
 
-**Decisões de design para CMAPSS:**
-- **7 sensores near-constant removidos** {1,5,6,10,16,18,19} — mantém os 14 sensores informativos
-- **RUL cap em 125 ciclos** — seguindo convenção da literatura (fase estável inicial tem RUL = constante)
-- **`window_size=30`** — ciclos CMAPSS são mais grossos que timesteps sintéticos
-- **`RobustScaler`** em vez de `StandardScaler` — distribições multi-modais em FD002/FD004
-- **Split a nível de motor** — previne leakage: o ciclo de vida completo de cada motor está em apenas um split
-- **Schema idêntico ao dado sintético** — zero mudanças no pipeline downstream
+**Decisões de design para o CMAPSS:**
+- **7 sensores quasi-constantes removidos** `{1,5,6,10,16,18,19}` — mantém os 14 sensores com variação informativa
+- **RUL limitado a 125 ciclos** — seguindo convenção da literatura: na fase estável inicial, o RUL é tratado como constante
+- **`window_size=30`** — cada ciclo CMAPSS é mais granular que um timestep sintético
+- **`RobustScaler`** em vez de `StandardScaler` — necessário para distribuições multi-modais em FD002/FD004, causadas por diferentes condições operacionais
+- **Split a nível de motor** — o ciclo de vida completo de cada motor fica integralmente em um único conjunto, eliminando vazamento temporal
+- **Schema idêntico ao dado sintético** — zero alterações no pipeline de pré-processamento downstream
 
 ### Gerador Sintético v2
 
-Para desenvolvimento, ablation studies e testes de pipeline onde dados reais não estão disponíveis.
+Utilizado para desenvolvimento, ablation studies e testes de pipeline quando dados reais não estão disponíveis.
 
 | Característica | Descrição |
 |----------------|-----------|
-| **Degradação não-monotônica** | Oscilação senoidal durante a fase de degradação — simula recuperação transiente vista em rolamentos reais |
+| **Degradação não-monotônica** | Oscilação senoidal durante a fase de degradação — simula recuperação transiente observada em rolamentos reais |
 | **Step faults** | 25% das máquinas têm um salto abrupto nos sensores (simula ruptura de vedação, falha de lubrificação) |
 | **Sensores correlacionados** | Acoplamento físico temperatura ↔ corrente: `T += α × I[t-1]` |
-| **Ruído heavy-tail** | Gaussian + Laplace (70/30) para simular outliers de sensor |
-| **Sensor dropout** | Forward-fill aleatório simula falhas de comunicação |
-| **Posição de falha variável** | Falha ocorre nos últimos 10% do ciclo de vida em posição aleatória |
+| **Ruído heavy-tail** | Gaussian + Laplace (70/30) para simular outliers de sensor sem picos catastróficos |
+| **Sensor dropout** | Preenchimento para frente aleatório simula falhas de comunicação do sensor |
+| **Posição de falha variável** | A falha ocorre nos últimos 10% do ciclo de vida em posição aleatória — não necessariamente no último timestep |
 
 ---
 
@@ -218,7 +254,7 @@ Para desenvolvimento, ablation studies e testes de pipeline onde dados reais nã
 | Early stopping | val_F1, patience=10 (CMAPSS) / 15 (sintético) |
 | Parâmetros | ~206k |
 
-> O bias do forget gate inicializado em 1.0 é um truque amplamente usado que evita gradientes que somem no início do treino — a LSTM aprende a lembrar por padrão.
+> O bias do forget gate inicializado em 1.0 é um ajuste amplamente utilizado que evita o desaparecimento de gradientes no início do treino — a LSTM aprende a reter informação por padrão antes de qualquer gradiente corrigir esse comportamento.
 
 ### CNN Temporal (1D Residual)
 
@@ -227,8 +263,8 @@ Para desenvolvimento, ablation studies e testes de pipeline onde dados reais nã
 | Arquitetura | Stem(1×1) → 4× ResidualBlock1D(dilation=1,2,4,8) → GlobalAvgPool → Dropout → FC |
 | Padrão de dilatação | Dobra a cada bloco: campo receptivo efetivo = 8×(kernel-1)+1 |
 | Ativação | GELU em todo o modelo |
-| Normalização | BatchNorm1d por camada conv |
-| Vantagem vs LSTM | Totalmente paralelizável, sem dependência sequencial |
+| Normalização | BatchNorm1d por camada convolucional |
+| Vantagem vs LSTM | Totalmente paralelizável, sem dependência sequencial; sem risco de gradientes que desaparecem |
 | Parâmetros | ~180k |
 
 ### Baselines sklearn
@@ -238,7 +274,7 @@ Para desenvolvimento, ablation studies e testes de pipeline onde dados reais nã
 | Random Forest | 200 árvores, max_depth=12, balanced class_weight |
 | Logistic Regression | Regularização L2 (C=1.0), StandardScaler no pipeline |
 
-Os baselines achatam as janelas para (N, T×F) — não capturam ordering temporal, mas são um sanity-check forte e surpreendentemente competitivos em FD001.
+Os baselines achatam as janelas para (N, T×F) — não capturam ordenação temporal, mas funcionam como referência sólida e são surpreendentemente competitivos em FD001 (condição uniforme).
 
 ---
 
@@ -247,18 +283,18 @@ Os baselines achatam as janelas para (N, T×F) — não capturam ordering tempor
 ```
 DataFrame bruto (machine_id, timestep, sensores, labels)
          ↓
-Split a nível de máquina (sem janela cruzando dois motores, sem motor em dois splits)
+Split a nível de máquina (sem janela cruzando dois motores, sem motor em dois conjuntos)
          ↓
-RobustScaler/StandardScaler fit APENAS nas máquinas de treino
+RobustScaler / StandardScaler ajustado APENAS com máquinas de treino
          ↓
 Extração de janela deslizante: (N, window_size, n_features)
-Label = valor failure_imminent do último timestep da janela
+Label = valor de failure_imminent no último timestep da janela
          ↓
 (X_train, y_train), (X_val, y_val), (X_test, y_test)
 ```
 
 **Por que split a nível de máquina?**
-Split aleatório por janela cria leakage severo: janelas consecutivas da mesma máquina compartilham ~90% dos timesteps. Um modelo treinado nas janelas 1–49 do motor X trivialmente prediz a janela 2–50. O split a nível de máquina garante que o conjunto de teste contém motores que o modelo **nunca viu em nenhum estado**.
+O split aleatório por janela cria vazamento severo: janelas consecutivas da mesma máquina compartilham ~90% dos timesteps. Um modelo treinado nas janelas 1–49 do motor X trivialmente prediz a janela 2–50 — não há nada a aprender. O split por motor garante que o conjunto de teste contém máquinas que o modelo **nunca viu em nenhum estado**.
 
 ---
 
@@ -268,38 +304,38 @@ Split aleatório por janela cria leakage severo: janelas consecutivas da mesma m
 
 | Métrica | Por que importa aqui |
 |---------|----------------------|
-| **PR-AUC** | Métrica primária para dados desbalanceados — ROC-AUC é otimista quando os negativos dominam |
-| **F1** | Média harmônica de precisão/recall, no threshold ótimo |
-| **MCC** | Matthews Correlation Coefficient — robusto ao desbalanceamento |
-| **Brier Score** | Mede qualidade de calibração (0 = perfeito) |
-| **ECE** | Expected Calibration Error — erro médio ponderado |predito − real| por bin de probabilidade |
-| **Custo Esperado** | Métrica de negócio: FN×$50k + FP×$5k no threshold ótimo |
+| **PR-AUC** | Métrica primária para dados desbalanceados — a ROC-AUC é otimista quando os negativos dominam |
+| **F1** | Média harmônica de precisão e recall, calculada no threshold ótimo |
+| **MCC** | Matthews Correlation Coefficient — robusto ao desbalanceamento de classes |
+| **Brier Score** | Mede a qualidade de calibração das probabilidades (0 = perfeito) |
+| **ECE** | Expected Calibration Error — erro médio ponderado `|probabilidade prevista − frequência real|` por bin |
+| **Custo Esperado** | Métrica de negócio: FN×$50k + FP×$5k no threshold ótimo de custo |
 
 ### Calibração Probabilística
 
-Probabilidades brutas de modelos neurais costumam ser mal calibradas. Post-hoc calibration:
-- **Platt Scaling**: regressão logística sobre os scores brutos, fit no conjunto de validação
-- **Isotonic Regression**: calibração monotônica não-paramétrica
-- Avaliado por Brier Score e ECE antes e depois da correção
+Probabilidades brutas de modelos neurais costumam ser mal calibradas — tendem a ser excessivamente confiantes ou conservadoras. Para corrigir isso, são aplicadas duas abordagens de calibração post-hoc:
+- **Platt Scaling**: regressão logística sobre os scores brutos, ajustada no conjunto de validação
+- **Isotonic Regression**: calibração monotônica não-paramétrica (requer pelo menos 1.000 amostras de validação)
+- Qualidade avaliada por Brier Score e ECE antes e após a correção
 
-### Threshold com Custo-Benefício
+### Seleção de Threshold por Custo
 
-O threshold F1-ótimo trata FP e FN igualmente. Neste domínio:
+O threshold F1-ótimo trata FP e FN de forma igualitária, o que não reflete o domínio. A formulação correta é:
 
 ```
 t* = C_FP × prevalência / (C_FP × prevalência + C_FN × (1 − prevalência))
 ```
 
-Com C_FN=$50k, C_FP=$5k, prevalência≈0.19 (CMAPSS FD001), o threshold teórico ótimo é ~0.09 — alertar de forma bem mais agressiva que o threshold padrão de 0.5.
+Com C_FN=$50k, C_FP=$5k e prevalência≈0.19 (CMAPSS FD001), o threshold teórico ótimo é ~0.09 — muito mais agressivo que o padrão de 0.5. Na prática, o threshold é encontrado varrendo a curva de custo esperado empiricamente.
 
 ### Testes de Significância Estatística
 
 | Teste | O que mede |
 |-------|-----------|
-| **McNemar** | Se dois classificadores cometem erros significativamente diferentes (qui-quadrado) |
-| **DeLong AUC CI** | IC 95% para diferença de AUC sem bootstrap (60× mais rápido) |
+| **McNemar** | Se dois classificadores cometem erros significativamente diferentes (qui-quadrado, gl=1) |
+| **DeLong AUC CI** | IC 95% para diferença de AUC sem bootstrap, usando placement values (60× mais rápido) |
 | **Permutation test** | Diferença de AUC sob permutação aleatória de labels; sem pressupostos distribucionais |
-| **Bootstrap CI** | IC 95% para F1, AUC, MCC via 500 reamostras |
+| **Bootstrap CI** | IC 95% para F1, AUC, MCC via 500 reamostras não-paramétricas |
 
 ---
 
@@ -307,10 +343,10 @@ Com C_FN=$50k, C_FP=$5k, prevalência≈0.19 (CMAPSS FD001), o threshold teóric
 
 | Abordagem | Modelos | O que revela |
 |-----------|---------|-------------|
-| **Importância intrínseca** | RF (`feature_importances_`), LR (`\|coef\|`) | Qual sensor × posição temporal foi mais preditivo |
+| **Importância intrínseca** | RF (`feature_importances_`), LR (`\|coef\|`) | Qual sensor × posição temporal contribuiu mais para as predições |
 | **Gradient saliency** | LSTM, CNN | dSaída/dEntrada — sensibilidade a perturbações em cada posição (t, f) |
-| **Permutation importance (sensor)** | Todos | Queda de F1 quando um sensor é permutado — testa se o modelo realmente usa aquele sensor |
-| **Permutation importance (temporal)** | Todos | Queda de F1 por bin temporal — revela se timesteps recentes importam mais |
+| **Permutation importance (sensor)** | Todos | Queda de F1 ao permutar um sensor — testa se o modelo de fato o utiliza |
+| **Permutation importance (temporal)** | Todos | Queda de F1 por bin temporal — revela se timesteps recentes têm mais peso |
 
 ```bash
 python scripts/run_interpretability.py --dataset cmapss
@@ -369,6 +405,7 @@ predictive-maintenance-ai-platform/
 │   ├── cmapss_config.yaml           # overrides para CMAPSS (window, scaler, epochs)
 │   └── model_config.yaml            # arquitetura e search spaces do HPO
 ├── tests/                           # pytest com 9 módulos de teste
+├── assets/images/                   # imagens para o README (copiar de reports/ após benchmark)
 ├── streamlit_app.py                 # dashboard interativo (5 abas)
 ├── cli.py                           # CLI unificado (click) com --dataset/--cmapss-subset
 ├── requirements.txt
@@ -377,7 +414,7 @@ predictive-maintenance-ai-platform/
 
 ---
 
-## Configuração e Execução
+## Execução Completa
 
 ### Dado Sintético
 
@@ -435,7 +472,9 @@ python cli.py ablation
 # Iniciar servidor
 python cli.py serve
 # → http://localhost:8000/docs
+```
 
+```
 # Health check
 GET /health
 → {"status": "healthy", "model_loaded": true, "model_type": "lstm"}
@@ -456,7 +495,7 @@ POST /predict
     "model_name": "lstm"
   }
 
-# Predição via CLI (single-timestep, janela preenchida por repetição)
+# Predição via CLI (janela preenchida com a leitura repetida)
 python cli.py predict \
   --temperature 88.3 --vibration 1.47 --pressure 6.1 --rpm 1850 --current 14.2
 ```
@@ -467,23 +506,23 @@ python cli.py predict \
 
 | Limitação | Impacto | Mitigação |
 |-----------|---------|-----------|
-| **FD001 é o dataset mais fácil** | Resultados podem não generalizar para FD002/FD004 | Scripts suportam todos os subsets; FD002/FD004 são os benchmarks mais representativos |
+| **FD001 é o dataset mais simples** | Resultados podem não generalizar para FD002/FD004 | Scripts suportam todos os subsets; FD002/FD004 são os benchmarks mais desafiadores e representativos |
 | **Window size fixo** | Não se adapta a máquinas com dinâmicas temporais distintas | Ablation cobre T∈{10,25,50,100}; configurável por deployment |
-| **Sem aprendizado online** | Drift de modelo tratado por retreino, não por atualização incremental | PSI alerts disparam retreino; calibrador pode ser atualizado sem retreinar |
-| **Gradient saliency é local** | Gradientes de entrada refletem sensibilidade linear local, não causalidade global | Permutation importance fornece visão global complementar |
-| **LSTM usa apenas último hidden state** | Sequências longas (>500 timesteps) podem perder sinal inicial | Flag bidirectional disponível; atenção é extensão natural |
+| **Sem aprendizado incremental** | Drift de modelo tratado por retreino completo | Alertas de PSI disparam retreino; o calibrador pode ser atualizado sem retreinar o modelo base |
+| **Gradient saliency é local** | Gradientes de entrada refletem sensibilidade linear local, não causalidade global | Permutation importance fornece uma visão global complementar |
+| **LSTM usa apenas o último hidden state** | Sequências longas (>500 timesteps) podem perder sinal do início | Flag bidirectional disponível; atenção é extensão natural |
 
 ---
 
 ## Próximos Passos
 
 1. **Mecanismo de atenção**: substituir o último hidden state por multi-head self-attention pooling
-2. **Transformer encoder**: positional encoding + self-attention para estado da arte
-3. **Fine-tuning por tipo de máquina**: backbone compartilhado, heads fine-tuned por tipo
-4. **Calibração online**: atualizar Platt Scaler incrementalmente com dados de produção
-5. **SHAP**: TreeSHAP para Random Forest (exato), GradientSHAP para neurais
+2. **Transformer encoder**: positional encoding + self-attention para desempenho estado da arte
+3. **Fine-tuning por tipo de máquina**: backbone compartilhado, heads ajustados por categoria
+4. **Calibração online**: atualizar o Platt Scaler incrementalmente com dados de produção
+5. **SHAP**: TreeSHAP para Random Forest (exato), GradientSHAP para modelos neurais
 6. **Integração com sensores reais**: ingestão via Kafka/MQTT, janela deslizante sobre stream ao vivo
-7. **Quantificação de incerteza**: Monte Carlo Dropout na inferência para incerteza epistêmica
+7. **Quantificação de incerteza**: Monte Carlo Dropout na inferência para estimar incerteza epistêmica
 
 ---
 
@@ -508,16 +547,15 @@ plotly>=5.18.0
 pytest tests/ -v --cov=src --cov-report=term-missing
 ```
 
-9 módulos de teste cobrindo: validação de schema, preprocessing, modelos, métricas, calibração, API, Dataset/DataLoader.
+9 módulos de teste cobrindo: validação de schema, pré-processamento, modelos, métricas, calibração, API, Dataset/DataLoader.
 
 ---
 
-## Autor
+## 👤 Autor
 
-**Jacques Flores**
-Engenheiro de IA | Machine Learning Engineer
+**Alexandre Flores Jacques**
 
 - GitHub: [github.com/floresjacques26](https://github.com/floresjacques26)
-- LinkedIn: *(adicionar link)*
+- LinkedIn: [linkedin.com/in/alexandre-jacques-237857256](https://www.linkedin.com/in/alexandre-jacques-237857256/)
 
-> Projeto desenvolvido como portfólio técnico de nível Staff, demonstrando domínio completo do ciclo de vida de ML — do problema de negócio ao sistema em produção com dados reais.
+Engenheiro de IA focado em modelagem, avaliação estatística e sistemas de Machine Learning aplicados a problemas industriais reais. Este projeto demonstra domínio completo do ciclo de vida de ML — da definição do problema de negócio ao sistema em produção com dados reais.
