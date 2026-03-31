@@ -318,7 +318,7 @@ def print_metrics_table(all_metrics: dict[str, dict], ci_results: dict[str, dict
             ci = ci_results[name]
             f1_ci = ci.get("f1", {})
             auc_ci = ci.get("roc_auc", {})
-            ci_str = f"  95% CI → F1=[{f1_ci.get('lower',0):.3f},{f1_ci.get('upper',0):.3f}]  AUC=[{auc_ci.get('lower',0):.3f},{auc_ci.get('upper',0):.3f}]"
+            ci_str = f"  95% CI  F1=[{f1_ci.get('lower',0):.3f},{f1_ci.get('upper',0):.3f}]  AUC=[{auc_ci.get('lower',0):.3f},{auc_ci.get('upper',0):.3f}]"
             lines.append("|" + f" {ci_str:<{sum(widths) + len(widths) - 3}} " + "|")
     lines.append(sep)
     table = "\n".join(lines)
@@ -426,7 +426,7 @@ def main() -> None:
     # ── Table ─────────────────────────────────────────────────────────────────
     table_str = print_metrics_table(all_metrics, ci_results)
     table_path = report_dir / "metrics_table.txt"
-    table_path.write_text(table_str)
+    table_path.write_text(table_str, encoding="utf-8")
 
     # ── Plots ─────────────────────────────────────────────────────────────────
     viz = EvaluationVisualizer(output_dir=str(report_dir))

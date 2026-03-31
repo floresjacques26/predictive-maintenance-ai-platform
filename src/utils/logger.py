@@ -29,7 +29,9 @@ def get_logger(name: str, level: int = logging.INFO, log_file: str | None = None
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    console_handler = logging.StreamHandler(sys.stdout)
+    import io
+    stdout_utf8 = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace") if hasattr(sys.stdout, "buffer") else sys.stdout
+    console_handler = logging.StreamHandler(stdout_utf8)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 

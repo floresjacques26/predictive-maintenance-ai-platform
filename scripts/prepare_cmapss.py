@@ -101,18 +101,34 @@ def download_cmapss(data_dir: Path) -> None:
 
         print()
         buf.seek(0)
-        logger.info("Download complete. Extracting…")
+        logger.info("Download complete. Extracting...")
 
-        with zipfile.ZipFile(buf) as zf:
-            for member in zf.namelist():
-                # Only extract .txt files, stripping any subdirectory prefix
+        with zipfile.ZipFile(buf) as outer_zf:
+            # The outer zip may contain a nested CMAPSSData.zip
+            inner_zip_names = [n for n in outer_zf.namelist() if n.lower().endswith(".zip")]
+            if inner_zip_names:
+                logger.info(f"Found nested zip: {inner_zip_names[0]} — extracting inner archive...")
+                inner_buf = io.BytesIO(outer_zf.read(inner_zip_names[0]))
+                work_zf = zipfile.ZipFile(inner_buf)
+            else:
+                work_zf = outer_zf
+
+            n_extracted = 0
+            for member in work_zf.namelist():
                 if member.lower().endswith(".txt"):
                     filename = Path(member).name
                     dest = data_dir / filename
-                    dest.write_bytes(zf.read(member))
-                    logger.info(f"  Extracted → {dest}")
+                    dest.write_bytes(work_zf.read(member))
+                    logger.info(f"  Extracted -> {dest.name}")
+                    n_extracted += 1
 
-        logger.info(f"CMAPSS dataset ready in {data_dir.resolve()}")
+            if inner_zip_names:
+                work_zf.close()
+
+        if n_extracted == 0:
+            raise RuntimeError("No .txt files found in the downloaded archive.")
+
+        logger.info(f"CMAPSS dataset ready in {data_dir.resolve()} ({n_extracted} files)")
 
     except Exception as exc:
         logger.error(f"Download failed: {exc}")
@@ -144,7 +160,7 @@ def validate_and_summarise(
         )
         present = loader.files_present()
         for fname, ok in present.items():
-            status = "✓" if ok else "✗ MISSING"
+            status = "OK" if ok else "MISSING"
             print(f"  {status}  {fname}")
 
         if not present.get(f"train_{subset}.txt"):
