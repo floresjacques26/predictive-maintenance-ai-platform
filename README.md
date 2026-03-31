@@ -10,7 +10,7 @@
 
 Acesse o dashboard diretamente:
 
-👉 **[INSERIR LINK STREAMLIT CLOUD]**
+👉 **[Abrir Dashboard](https://floresjacques26-predictive-maintenance-ai--streamlit-app-m3u4ig.streamlit.app/)**
 
 Ou execute localmente:
 
