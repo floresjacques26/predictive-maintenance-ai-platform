@@ -18,17 +18,13 @@ data/processed/*.pkl
 data/processed/*.npy
 data/synthetic/*.csv
 
-# Model checkpoints & artefacts
-models/checkpoints/*.pt
-models/checkpoints/*.pth
-models/checkpoints/**/*.pt
-models/checkpoints/**/*.pth
-models/baselines/*.joblib
-models/baselines/**/*.joblib
+# Model checkpoints & artefacts (allow trained models for Streamlit Cloud)
 models/hpo_checkpoints/
 
-# Reports (generated — not committed)
-reports/
+# Reports (allow benchmark outputs for Streamlit Cloud)
+reports/benchmark/cmapss/FD001/*.log
+reports/cmapss/FD001/lstm/training_history.json
+reports/cmapss/FD001/cnn/training_history.json
 
 # MLflow
 mlruns/
