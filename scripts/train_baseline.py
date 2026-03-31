@@ -1,8 +1,12 @@
 """Train Random Forest and Logistic Regression baselines.
 
+Supports both the synthetic dataset and NASA CMAPSS.
+
 Usage
 -----
-python scripts/train_baseline.py --data-path data/synthetic/sensor_data.csv
+python scripts/train_baseline.py                              # synthetic
+python scripts/train_baseline.py --dataset cmapss            # CMAPSS FD001
+python scripts/train_baseline.py --dataset cmapss --cmapss-subset FD002
 """
 
 import argparse
@@ -16,6 +20,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from src.data.dataset_factory import load_dataset
 from src.data.preprocessing import SensorDataPreprocessor
 from src.evaluation.metrics import compute_classification_metrics, find_optimal_threshold
 from src.evaluation.visualization import EvaluationVisualizer
@@ -25,27 +30,47 @@ from src.utils.logger import get_logger
 
 logger = get_logger("train_baseline")
 
-SENSOR_COLS = ["temperature", "vibration", "pressure", "rpm", "current"]
-
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train sklearn baseline models.")
+    parser.add_argument(
+        "--dataset", choices=["synthetic", "cmapss"], default="synthetic",
+    )
+    parser.add_argument(
+        "--cmapss-subset", choices=["FD001", "FD002", "FD003", "FD004"], default="FD001",
+    )
     parser.add_argument("--data-path", type=str, default="data/synthetic/sensor_data.csv")
     parser.add_argument("--config", type=str, default="configs/base_config.yaml")
-    parser.add_argument("--output-dir", type=str, default="models/baselines")
-    parser.add_argument("--report-dir", type=str, default="reports/baselines")
+    parser.add_argument("--output-dir", type=str, default=None)
+    parser.add_argument("--report-dir", type=str, default=None)
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    cfg = load_config(args.config)
 
-    logger.info(f"Loading data from {args.data_path}")
-    df = pd.read_csv(args.data_path)
+    config_paths = [args.config]
+    if args.dataset == "cmapss":
+        config_paths.append("configs/cmapss_config.yaml")
+    cfg = load_config(*config_paths)
+
+    if args.dataset == "cmapss":
+        cfg.setdefault("dataset", {}).setdefault("cmapss", {})["subset"] = args.cmapss_subset
+        subset = args.cmapss_subset
+        output_dir = args.output_dir or f"models/baselines/cmapss/{subset}"
+        report_dir = args.report_dir or f"reports/baselines/cmapss/{subset}"
+    else:
+        output_dir = args.output_dir or "models/baselines"
+        report_dir = args.report_dir or "reports/baselines"
+
+    df, sensor_cols = load_dataset(
+        dataset_type=args.dataset,
+        cfg=cfg,
+        data_path=args.data_path,
+    )
 
     preprocessor = SensorDataPreprocessor(
-        sensor_columns=SENSOR_COLS,
+        sensor_columns=sensor_cols,
         target_column="failure_imminent",
         window_size=cfg.data.window_size,
         step_size=cfg.data.step_size,
@@ -57,8 +82,9 @@ def main() -> None:
     (X_train, y_train), (X_val, y_val), (X_test, y_test) = preprocessor.fit_transform(df)
 
     mlflow.set_experiment(cfg.experiment.experiment_name)
-    visualizer = EvaluationVisualizer(output_dir=args.report_dir)
-    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+    visualizer = EvaluationVisualizer(output_dir=report_dir)
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    Path(report_dir).mkdir(parents=True, exist_ok=True)
 
     models = {
         "RandomForest": RandomForestBaseline(),
@@ -89,7 +115,7 @@ def main() -> None:
                     logger.info(f"  {k}: {v:.4f}")
 
             # Save model
-            out = Path(args.output_dir) / f"{name.lower()}.joblib"
+            out = Path(output_dir) / f"{name.lower()}.joblib"
             model.save(out)
             mlflow.log_artifact(str(out))
 
@@ -117,7 +143,7 @@ def main() -> None:
     visualizer.plot_model_comparison(all_metrics, save_name="baselines_comparison.png")
 
     # Save results summary
-    summary_path = Path(args.report_dir) / "baseline_metrics.json"
+    summary_path = Path(report_dir) / "baseline_metrics.json"
     with open(summary_path, "w") as f:
         json.dump(all_metrics, f, indent=2, default=str)
     logger.info(f"Baseline metrics saved → {summary_path}")
