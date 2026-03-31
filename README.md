@@ -58,6 +58,60 @@ This is a **sliding window binary classification** problem with:
 
 ---
 
+## Datasets
+
+This platform supports two datasets selectable via `--dataset synthetic|cmapss`.
+
+### NASA CMAPSS Turbofan Engine Degradation Dataset
+
+Real run-to-failure data from turbofan engine simulations. Widely used benchmark in the PHM (Prognostics and Health Management) literature.
+
+| Sub-dataset | Train engines | Test engines | Op. conditions | Fault modes |
+|-------------|--------------|-------------|----------------|-------------|
+| **FD001** | 100 | 100 | 1 | 1 |
+| **FD002** | 260 | 259 | 6 | 1 |
+| **FD003** | 100 | 100 | 1 | 2 |
+| **FD004** | 249 | 248 | 6 | 2 |
+
+**Sensor selection**: 7 near-constant sensors `{1,5,6,10,16,18,19}` are removed, leaving 14 informative sensors. Operating settings are included for FD002/FD004 (multi-condition variants).
+
+**Binary target construction**: RUL is computed per-cycle as `max_cycle − current_cycle` for training engines, and reconstructed from the provided `RUL_FD00X.txt` ground-truth values for test engines. `failure_imminent = (RUL ≤ 30)`.
+
+**Piece-wise linear RUL cap** (`clip_rul=125`): following the standard literature convention, RUL is capped at 125 in the early stable phase — engines are assumed to be in the same health state before degradation begins.
+
+```bash
+# Download and validate all sub-datasets
+python scripts/prepare_cmapss.py
+
+# Validate only (no download)
+python scripts/prepare_cmapss.py --no-download --subset FD001
+
+# Train on CMAPSS
+python scripts/train_neural_model.py --model-type lstm --dataset cmapss --cmapss-subset FD001
+python scripts/run_full_benchmark.py --dataset cmapss --cmapss-subset FD002
+```
+
+**Key design decisions for CMAPSS:**
+- `window_size=30` (cycles are coarser than synthetic timesteps)
+- `step_size=1` (dense stride; cycles are already coarse-grained)
+- `RobustScaler` instead of `StandardScaler` — handles multi-modal sensor distributions in FD002/FD004 caused by different operating conditions
+- Machine (engine) level splits — prevents leakage across engine lifecycles
+- Outputs identical DataFrame schema as the synthetic generator so the entire downstream pipeline (`SensorDataPreprocessor`, `DataLoader`, training scripts) works unchanged
+
+**Synthetic vs Real data trade-offs:**
+
+| Aspect | Synthetic | NASA CMAPSS |
+|--------|-----------|-------------|
+| Data availability | On-demand (any size) | Fixed: 100–260 train engines |
+| Label quality | Perfect (generated) | Derived from RUL, may have noise |
+| Class balance control | Configurable | Fixed ~3–8% positive rate |
+| Realism | Engineered patterns | Real degradation physics |
+| Feature count | 5 sensors | 14 sensors (+ op settings) |
+| Generalisability | Unknown distribution shift | Known benchmark, comparable to literature |
+| Use case | Pipeline development, ablations | Validation against published results |
+
+---
+
 ## Synthetic Data Generator v2
 
 Real industrial sensor data is rarely available due to confidentiality and class imbalance. The v2 generator produces statistically plausible machine lifecycle data with the following properties:
@@ -261,33 +315,115 @@ The benchmark script produces:
 
 ---
 
+## Benchmark Results
+
+Results on the held-out test set (20% of machines, no temporal leakage).
+Thresholds are selected to maximise F1 on the test set; bootstrap 95% CIs computed with n=500.
+
+### Synthetic Dataset (200 machines, window=50, stride=10)
+
+| Model | F1 | ROC-AUC | PR-AUC | Recall | Precision | MCC | Brier | ECE |
+|-------|----|---------|--------|--------|-----------|-----|-------|-----|
+| **LSTM** | — | — | — | — | — | — | — | — |
+| **CNN1D** | — | — | — | — | — | — | — | — |
+| Random Forest | — | — | — | — | — | — | — | — |
+| Logistic Regression | — | — | — | — | — | — | — | — |
+
+> Run `python scripts/run_full_benchmark.py --n-machines 200 --epochs 100` to populate this table.
+
+### NASA CMAPSS FD001 (single condition, window=30, stride=1)
+
+| Model | F1 | ROC-AUC | PR-AUC | Recall | Precision | MCC | Brier | ECE |
+|-------|----|---------|--------|--------|-----------|-----|-------|-----|
+| **LSTM** | — | — | — | — | — | — | — | — |
+| **CNN1D** | — | — | — | — | — | — | — | — |
+| Random Forest | — | — | — | — | — | — | — | — |
+| Logistic Regression | — | — | — | — | — | — | — | — |
+
+> Run `python scripts/run_full_benchmark.py --dataset cmapss --cmapss-subset FD001 --epochs 80` to populate.
+
+**Interpretation notes:**
+- Neural models (LSTM, CNN) are expected to outperform baselines on PR-AUC and F1 due to their ability to capture temporal patterns in degradation signals
+- Baselines flatten windows to (N, T×F) — strong on simple monotonic degradation, weaker on non-monotonic patterns
+- FD002/FD004 (multi-condition) are harder than FD001/FD003; RobustScaler is critical there
+- Cost-optimal threshold is typically much lower than F1-optimal (0.1–0.2 range) due to asymmetric FN/FP costs
+
+---
+
+## Streamlit Dashboard
+
+Interactive 5-tab dashboard for exploring results, running live predictions, and interpreting models.
+
+```bash
+streamlit run streamlit_app.py
+```
+
+**Tabs:**
+1. **Overview** — project summary, model architecture, dataset statistics
+2. **Benchmark** — full metrics table, bootstrap CIs, all comparison plots (ROC, PR, calibration, cost curves, confusion matrices)
+3. **Live Prediction** — real-time failure probability from sensor inputs + Plotly gauge chart; supports CSV batch upload
+4. **Error Analysis** — FP/FN breakdown by machine type, degradation stage, proximity to failure
+5. **Interpretability** — sensor importance bar charts, temporal importance line charts, gradient saliency plots
+
+The sidebar dataset selector (`synthetic` / `cmapss` + sub-dataset) switches all tabs simultaneously — all paths and checkpoints are auto-derived.
+
+---
+
 ## Quick Start
 
 ```bash
 # 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. Full pipeline
+# ── Synthetic dataset ────────────────────────────────────────────────────────
+
+# 2. Full pipeline (generate → train → benchmark → report)
 python scripts/run_full_benchmark.py --n-machines 200 --epochs 50
 
-# 3. Error analysis
-python scripts/run_error_analysis.py
+# ── NASA CMAPSS real dataset ─────────────────────────────────────────────────
 
-# 4. Interpretability
+# 3. Download + validate CMAPSS data
+python scripts/prepare_cmapss.py
+
+# 4. Train on CMAPSS FD001
+python scripts/train_neural_model.py --model-type lstm --dataset cmapss
+python scripts/train_neural_model.py --model-type cnn  --dataset cmapss
+
+# 5. Full CMAPSS benchmark (FD002 multi-condition)
+python scripts/run_full_benchmark.py --dataset cmapss --cmapss-subset FD002 --epochs 80
+
+# ── Analysis & Interpretability ───────────────────────────────────────────────
+
+# 6. Error analysis (both datasets supported)
+python scripts/run_error_analysis.py
+python scripts/run_error_analysis.py --dataset cmapss
+
+# 7. Interpretability
 python scripts/run_interpretability.py
 
-# 5. Serve the API
+# ── Dashboard ────────────────────────────────────────────────────────────────
+
+# 8. Launch Streamlit dashboard (5 tabs: Overview, Benchmark, Prediction, Error, Interpret)
+streamlit run streamlit_app.py
+
+# ── CLI ──────────────────────────────────────────────────────────────────────
+
+# 9. CLI: train on CMAPSS via unified interface
+python cli.py train --model lstm --dataset cmapss --cmapss-subset FD001
+python cli.py compare --dataset cmapss --skip-training
+
+# 10. Serve the inference API
 python cli.py serve
 # → http://localhost:8000/docs
 
-# 6. Single prediction via CLI
+# 11. Single prediction via CLI
 python cli.py predict \
   --temperature 88.3 --vibration 1.47 --pressure 6.1 --rpm 1850 --current 14.2
 
-# 7. Hyperparameter optimisation
+# 12. Hyperparameter optimisation
 python cli.py tune --n-trials 50 --timeout 3600
 
-# 8. Ablation study
+# 13. Ablation study
 python cli.py ablation
 ```
 
@@ -326,6 +462,8 @@ predictive-maintenance-ai-platform/
 ├── src/
 │   ├── data/
 │   │   ├── synthetic_generator.py   # v2: non-monotonic, step faults, correlated sensors
+│   │   ├── cmapss_loader.py         # NASA CMAPSS loader (all 4 sub-datasets)
+│   │   ├── dataset_factory.py       # unified load_dataset() for synthetic + CMAPSS
 │   │   ├── preprocessing.py         # windowing, machine-level splits, scaling
 │   │   ├── dataset.py               # PyTorch Dataset + DataLoader factory
 │   │   └── data_validator.py        # schema validation + PSI drift detection
@@ -354,9 +492,10 @@ predictive-maintenance-ai-platform/
 │       ├── checkpointing.py         # save/load checkpoint
 │       └── logger.py                # structured logging
 ├── scripts/
-│   ├── run_full_benchmark.py        # MASTER: generate → train → benchmark → report
-│   ├── train_neural_model.py        # LSTM or CNN training (--model-type lstm|cnn)
-│   ├── train_baseline.py            # RF + LR training
+│   ├── run_full_benchmark.py        # MASTER: generate → train → benchmark → report (--dataset)
+│   ├── train_neural_model.py        # LSTM or CNN training (--model-type, --dataset)
+│   ├── train_baseline.py            # RF + LR training (--dataset)
+│   ├── prepare_cmapss.py            # download + validate NASA CMAPSS data
 │   ├── compare_models.py            # side-by-side comparison of all checkpoints
 │   ├── run_error_analysis.py        # detailed FP/FN breakdown
 │   ├── run_interpretability.py      # feature importance for all models
@@ -365,6 +504,7 @@ predictive-maintenance-ai-platform/
 │   └── run_hyperparameter_search.py # Optuna HPO
 ├── configs/
 │   ├── base_config.yaml             # data, training, evaluation config
+│   ├── cmapss_config.yaml           # CMAPSS overrides (window, scaler, epochs)
 │   └── model_config.yaml            # architecture and HPO search spaces
 ├── tests/
 │   ├── test_data_validation.py      # generator v2 schema tests
@@ -376,7 +516,8 @@ predictive-maintenance-ai-platform/
 │   ├── test_data_validator.py       # schema validation, PSI drift
 │   ├── test_api.py                  # FastAPI endpoint tests
 │   └── test_dataset.py              # Dataset + DataLoader
-├── cli.py                           # unified Click CLI
+├── streamlit_app.py                 # interactive dashboard (5 tabs)
+├── cli.py                           # unified Click CLI (--dataset / --cmapss-subset)
 ├── requirements.txt
 └── Dockerfile
 ```
@@ -387,7 +528,7 @@ predictive-maintenance-ai-platform/
 
 | Limitation | Impact | Mitigation |
 |-----------|--------|------------|
-| **Synthetic data** | Distributional assumptions may not match real sensors | Generator v2 adds realism; PSI drift detection for production |
+| **Synthetic data** | Distributional assumptions may not match real sensors | NASA CMAPSS integration now available as real-data validation |
 | **Fixed window size** | Cannot adapt to machines with different temporal dynamics | Ablation covers T∈{10,25,50,100}; configurable per deployment |
 | **No multi-task learning** | Single model across all machine types | machine_type column available; per-type fine-tuning is natural extension |
 | **Gradient saliency is local** | Input gradients reflect local linear sensitivity, not global causal importance | Permutation importance provides complementary global view |
@@ -417,7 +558,8 @@ seaborn>=0.12.0       mlflow>=2.7.0         fastapi>=0.103.0
 pydantic>=2.3.0       uvicorn>=0.23.0       optuna>=3.3.0
 pyyaml>=6.0           python-dotenv>=1.0.0  pytest>=7.4.0
 pytest-cov>=4.1.0     httpx>=0.24.0         click>=8.1.0
-tqdm>=4.65.0          joblib>=1.3.0
+tqdm>=4.65.0          joblib>=1.3.0         streamlit>=1.28.0
+plotly>=5.18.0
 ```
 
 ---
